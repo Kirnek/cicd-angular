@@ -1,18 +1,19 @@
-# Nombre que aparece en la pestaña Actions de GitHub
+# Nombre que aparece en la pestaña Actions
 name: Angular CI/CD
 
-# Cuándo se ejecuta el workflow
+# Cuándo se ejecuta: en PRs contra main y en push a main
 on:
   pull_request:
-    branches: [main]   # en cada PR contra main
+    branches: [main]
   push:
-    branches: [main]   # y al hacer push a main (así se ve en verde al subirlo)
+    branches: [main]
 
 jobs:
+  # Job 1: CI. Compila el proyecto (se ejecuta en PRs y en push a main)
   build:
-    runs-on: ubuntu-latest   # máquina virtual de GitHub con Linux
+    runs-on: ubuntu-latest
     permissions:
-      contents: read         # este job solo necesita leer el código
+      contents: read                 # solo necesita leer el código
     steps:
       - name: Descargar código
         uses: actions/checkout@v4
@@ -21,12 +22,33 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm           # cachea las dependencias para ir más rápido
+          cache: npm
 
       - name: Instalar dependencias
-        run: npm ci            # instala exactamente lo que dice package-lock.json
+        run: npm ci
 
       - name: Compilar Angular
-        # Si hay errores de compilación, este paso falla y la PR queda bloqueada.
-        # --base-href debe coincidir con el nombre del repositorio.
         run: npx ng build --base-href /cicd-angular/
+
+      # Solo en push (no en PRs): empaqueta la carpeta compilada como artefacto de Pages
+      - name: Subir artefacto para GitHub Pages
+        if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/cicd-angular/browser
+
+  # Job 2: CD. Publica la web. Solo se ejecuta si build ha pasado y es un push a main
+  deploy:
+    needs: build                     # no empieza hasta que build termine bien
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write                   # permiso para publicar en Pages
+      id-token: write                # permiso de identidad que exige el despliegue
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Desplegar en GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
