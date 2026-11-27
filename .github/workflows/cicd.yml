@@ -1,0 +1,32 @@
+# Nombre que aparece en la pestaña Actions de GitHub
+name: Angular CI/CD
+
+# Cuándo se ejecuta el workflow
+on:
+  pull_request:
+    branches: [main]   # en cada PR contra main
+  push:
+    branches: [main]   # y al hacer push a main (así se ve en verde al subirlo)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest   # máquina virtual de GitHub con Linux
+    permissions:
+      contents: read         # este job solo necesita leer el código
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm           # cachea las dependencias para ir más rápido
+
+      - name: Instalar dependencias
+        run: npm ci            # instala exactamente lo que dice package-lock.json
+
+      - name: Compilar Angular
+        # Si hay errores de compilación, este paso falla y la PR queda bloqueada.
+        # --base-href debe coincidir con el nombre del repositorio.
+        run: npx ng build --base-href /cicd-angular/
